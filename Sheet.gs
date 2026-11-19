@@ -154,10 +154,86 @@ function generateAnonymousSLTResults() {
   SpreadsheetApp.getUi().showModalDialog(html, "SLT Doc Updated");
 }
 
+function syncBallotToForm() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const formUrl = ss.getFormUrl();
+
+  if (!formUrl) {
+    SpreadsheetApp.getUi().alert("No Google Form is linked to this spreadsheet.");
+    return;
+  }
+
+  const setupSheet = ss.getSheetByName("Ballot Setup");
+  if (!setupSheet) {
+    SpreadsheetApp.getUi().alert("Create a tab named 'Ballot Setup' with columns: Category | Activity Name | Description | Options");
+    return;
+  }
+
+  const rows = setupSheet.getDataRange().getValues();
+  if (rows.length < 2) {
+    SpreadsheetApp.getUi().alert("Add at least one activity row to 'Ballot Setup' first.");
+    return;
+  }
+
+  const ui = SpreadsheetApp.getUi();
+  const confirm = ui.alert(
+    "Rebuild Form Questions?",
+    "This will replace existing questions on the linked Form with the rows in 'Ballot Setup'. Proceed?",
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) return;
+
+  const form = FormApp.openByUrl(formUrl);
+  form.getItems().forEach(item => form.deleteItem(item));
+
+  let currentCategory = "";
+
+  for (let i = 1; i < rows.length; i++) {
+    const category = rows[i][0].toString().trim();
+    const activity = rows[i][1].toString().trim();
+    const description = rows[i][2].toString().trim();
+    const rawOptions = rows[i][3].toString().trim();
+
+    if (!activity) continue;
+
+    if (category && category !== currentCategory) {
+      currentCategory = category;
+      if (i > 1) {
+        form.addPageBreakItem().setTitle(currentCategory);
+      } else {
+        form.addSectionHeaderItem().setTitle(currentCategory);
+      }
+    }
+
+    if (category.toLowerCase() === "rating") {
+      const scaleItem = form.addScaleItem()
+        .setTitle(activity)
+        .setBounds(1, 10)
+        .setLabels("1 - Needs Improvement", "10 - Excellent")
+        .setRequired(true);
+      if (description) scaleItem.setHelpText(description);
+    } else {
+      const choices = rawOptions
+        ? rawOptions.split(/,\s*/).map(c => c.trim()).filter(Boolean)
+        : ["Yes", "No", "Abstain"];
+
+      const mcItem = form.addMultipleChoiceItem()
+        .setTitle(activity)
+        .setChoiceValues(choices)
+        .setRequired(true);
+      if (description) mcItem.setHelpText(description);
+    }
+  }
+
+  ui.alert("Google Form successfully updated from 'Ballot Setup'!");
+}
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("SLT Tools")
     .addItem("Refresh Vote Summary Tab", "updateSummaryTabOnly")
     .addItem("Update Meeting Brief (Google Doc)", "generateAnonymousSLTResults")
+    .addSeparator()
+    .addItem("Sync 'Ballot Setup' to Form", "syncBallotToForm")
     .addToUi();
 }
