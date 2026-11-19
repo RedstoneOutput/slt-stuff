@@ -1,0 +1,103 @@
+function onOpen() {
+  DocumentApp.getUi()
+    .createMenu("SLT Notes Tools")
+    .addItem("Start New Meeting Template", "insertMeetingTemplate")
+    .addItem("Import Latest Vote Results", "importVoteResultsToDoc")
+    .addItem("Archive Past Meetings", "archiveOldMeetings")
+    .addToUi();
+}
+
+function insertMeetingTemplate() {
+  const doc = DocumentApp.getActiveDocument();
+  const body = doc.getBody();
+  const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MMMM d, yyyy");
+
+  const cursor = body.editAsText();
+  
+  body.insertParagraph(0, `SLT Meeting Minutes — ${dateStr}`)
+      .setHeading(DocumentApp.ParagraphHeading.HEADING1);
+
+  const metaParagraph = body.insertParagraph(1, "Attendees: [ ] Principal  [ ] Teacher Rep 1  [ ] Teacher Rep 2  [ ] Parent Rep  [ ] Tech Specialist\n");
+  metaParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+
+  body.insertParagraph(2, "Agenda & Discussion").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  body.insertListItem(3, "Welcome & Approval of Previous Minutes");
+  body.insertListItem(4, "After School Activities Review");
+  body.insertListItem(5, "In School Activities Review");
+  body.insertListItem(6, "Undiscussed Activities & Floor Debate");
+
+  body.insertParagraph(7, "\nAction Items").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  const actionTable = body.insertTable(8, [
+    ["Task / Decision", "Owner", "Due Date"],
+    ["", "", ""],
+    ["", "", ""]
+  ]);
+  actionTable.getRow(0).setBackgroundColor("#e8eaed");
+
+  body.insertParagraph(9, "\n--- PAGE BREAK ---\n").setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  DocumentApp.getUi().alert("New meeting template inserted at the top of the document!");
+}
+
+function importVoteResultsToDoc() {
+  const doc = DocumentApp.getActiveDocument();
+  const body = doc.getBody();
+  
+  const props = PropertiesService.getDocumentProperties();
+  const votingDocId = props.getProperty("SLT_BRIEF_DOC_ID");
+
+  if (!votingDocId) {
+    DocumentApp.getUi().alert("No linked voting brief found. Run the spreadsheet script first to generate the persistent voting doc.");
+    return;
+  }
+
+  try {
+    const votingDoc = DocumentApp.openById(votingDocId);
+    const votingText = votingDoc.getBody().getText();
+
+    body.appendParagraph("\nImported Voting Results Snapshot").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(votingText);
+    
+    DocumentApp.getUi().alert("Latest voting results successfully imported into the document!");
+  } catch (e) {
+    DocumentApp.getUi().alert("Could not access the voting document. Check if it was deleted.");
+  }
+}
+
+function archiveOldMeetings() {
+  const doc = DocumentApp.getActiveDocument();
+  const body = doc.getBody();
+  const paragraphs = body.getChildren();
+
+  let archiveDoc = null;
+  const props = PropertiesService.getDocumentProperties();
+  let archiveId = props.getProperty("SLT_ARCHIVE_DOC_ID");
+
+  if (archiveId) {
+    try {
+      archiveDoc = DocumentApp.openById(archiveId);
+    } catch (e) {
+      archiveDoc = null;
+    }
+  }
+
+  if (!archiveDoc) {
+    archiveDoc = DocumentApp.create("SLT Meeting Notes Archive");
+    props.setProperty("SLT_ARCHIVE_DOC_ID", archiveDoc.getId());
+  }
+
+  const archiveBody = archiveDoc.getBody();
+  archiveBody.appendParagraph(`Archived on: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd")}\n`).setHeading(DocumentApp.ParagraphHeading.HEADING3);
+
+  let movedCount = 0;
+  if (paragraphs.length > 50) {
+    for (let i = 50; i < paragraphs.length; i++) {
+      const el = paragraphs[i].copy();
+      archiveBody.appendParagraph(el);
+      paragraphs[i].removeFromParent();
+      movedCount++;
+    }
+    DocumentApp.getUi().alert(`Archived ${movedCount} old paragraphs to the SLT Archive document.`);
+  } else {
+    DocumentApp.getUi().alert("Document is still short. No archiving needed yet.");
+  }
+}
