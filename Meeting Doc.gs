@@ -2,6 +2,7 @@ function onOpen() {
   DocumentApp.getUi()
     .createMenu("SLT Notes Tools")
     .addItem("Start New Meeting Template", "insertMeetingTemplate")
+    .addItem("Link Meeting Brief Doc ID", "linkMeetingBriefDoc")
     .addItem("Import Latest Vote Results", "importVoteResultsToDoc")
     .addItem("Archive Past Meetings", "archiveOldMeetings")
     .addToUi();
@@ -17,7 +18,7 @@ function insertMeetingTemplate() {
   body.insertParagraph(0, `SLT Meeting Minutes — ${dateStr}`)
       .setHeading(DocumentApp.ParagraphHeading.HEADING1);
 
-  const metaParagraph = body.insertParagraph(1, "Attendees: [ ] Principal  [ ] Teacher Rep 1  [ ] Teacher Rep 2  [ ] Parent Rep  [ ] Tech Specialist\n");
+  const metaParagraph = body.insertParagraph(1, "Attendees: Mrs. Sharples, President, Vice President, Secretary, Treasurer, Historian, and Technology Specialist. Representatives:\n");
   metaParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
 
   body.insertParagraph(2, "Agenda & Discussion").setHeading(DocumentApp.ParagraphHeading.HEADING2);
@@ -36,6 +37,20 @@ function insertMeetingTemplate() {
 
   body.insertParagraph(9, "\n--- PAGE BREAK ---\n").setHeading(DocumentApp.ParagraphHeading.NORMAL);
   DocumentApp.getUi().alert("New meeting template inserted at the top of the document!");
+}
+
+function linkMeetingBriefDoc() {
+  const ui = DocumentApp.getUi();
+  const response = ui.prompt("Link Meeting Brief Document", "Please enter the Google Doc ID for the Meeting Brief:", ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() == ui.Button.OK) {
+    const docId = response.getResponseText().trim();
+    if (docId) {
+      PropertiesService.getDocumentProperties().setProperty("SLT_BRIEF_DOC_ID", docId);
+      ui.alert("Meeting Brief Document ID successfully linked!");
+    } else {
+      ui.alert("Invalid ID entered.");
+    }
+  }
 }
 
 function importVoteResultsToDoc() {
