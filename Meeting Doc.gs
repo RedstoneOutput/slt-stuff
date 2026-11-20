@@ -2,8 +2,8 @@ function onOpen() {
   DocumentApp.getUi()
     .createMenu("SLT Notes Tools")
     .addItem("Start New Meeting Template", "insertMeetingTemplate")
-    .addItem("Link Meeting Brief Doc ID", "linkMeetingBriefDoc")
     .addItem("Import Latest Vote Results", "importVoteResultsToDoc")
+    .addItem("Link Meeting Brief Document", "linkMeetingBriefDoc")
     .addItem("Archive Past Meetings", "archiveOldMeetings")
     .addToUi();
 }
@@ -41,14 +41,21 @@ function insertMeetingTemplate() {
 
 function linkMeetingBriefDoc() {
   const ui = DocumentApp.getUi();
-  const response = ui.prompt("Link Meeting Brief Document", "Please enter the Google Doc ID for the Meeting Brief:", ui.ButtonSet.OK_CANCEL);
+  const response = ui.prompt("Link Meeting Brief Document", "Enter the Google Doc ID or URL for the Meeting Brief:", ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() == ui.Button.OK) {
-    const docId = response.getResponseText().trim();
+    let input = response.getResponseText().trim();
+    let docId = input;
+    if (input.includes("/d/")) {
+      const match = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match) {
+        docId = match[1];
+      }
+    }
     if (docId) {
       PropertiesService.getDocumentProperties().setProperty("SLT_BRIEF_DOC_ID", docId);
-      ui.alert("Meeting Brief Document ID successfully linked!");
+      ui.alert("Meeting Brief document successfully linked!");
     } else {
-      ui.alert("Invalid ID entered.");
+      ui.alert("Invalid ID or URL entered.");
     }
   }
 }
@@ -61,7 +68,7 @@ function importVoteResultsToDoc() {
   const votingDocId = props.getProperty("SLT_BRIEF_DOC_ID");
 
   if (!votingDocId) {
-    DocumentApp.getUi().alert("No linked voting brief found. Run the spreadsheet script first to generate the persistent voting doc.");
+    DocumentApp.getUi().alert("No linked voting brief found. Use the menu option 'Link Meeting Brief Document' to connect it.");
     return;
   }
 
@@ -74,7 +81,7 @@ function importVoteResultsToDoc() {
     
     DocumentApp.getUi().alert("Latest voting results successfully imported into the document!");
   } catch (e) {
-    DocumentApp.getUi().alert("Could not access the voting document. Check if it was deleted.");
+    DocumentApp.getUi().alert("Could not access the voting document. Check if it was deleted or if the ID is correct.");
   }
 }
 
