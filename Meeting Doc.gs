@@ -12,8 +12,6 @@ function insertMeetingTemplate() {
   const doc = DocumentApp.getActiveDocument();
   const body = doc.getBody();
   const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MMMM d, yyyy");
-
-  const cursor = body.editAsText();
   
   body.insertParagraph(0, `SLT Meeting — ${dateStr}`)
       .setHeading(DocumentApp.ParagraphHeading.HEADING1);
@@ -27,15 +25,16 @@ function insertMeetingTemplate() {
   body.insertListItem(5, "?");
   body.insertListItem(6, "?");
 
-  body.insertParagraph(7, "\nAction Items").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  body.insertParagraph(7, "\nAction Items & Decisions").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const actionTable = body.insertTable(8, [
-    ["Task / Decision", "Owner", "Due Date"],
-    ["", "", ""],
-    ["", "", ""]
+    ["Status", "Action Item / Motion", "Assigned Owner", "Deadline"],
+    ["[ ]", "", "", ""],
+    ["[ ]", "", "", ""],
+    ["[ ]", "", "", ""]
   ]);
   actionTable.getRow(0).setBackgroundColor("#e8eaed");
 
-  body.insertParagraph(9, "\n--- PAGE BREAK ---\n").setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  body.insertPageBreak(9);
   DocumentApp.getUi().alert("New meeting template inserted at the top of the document!");
 }
 
@@ -88,7 +87,7 @@ function importVoteResultsToDoc() {
 function archiveOldMeetings() {
   const doc = DocumentApp.getActiveDocument();
   const body = doc.getBody();
-  const paragraphs = body.getChildren();
+  const children = body.getChildren();
 
   let archiveDoc = null;
   const props = PropertiesService.getDocumentProperties();
@@ -111,14 +110,22 @@ function archiveOldMeetings() {
   archiveBody.appendParagraph(`Archived on: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd")}\n`).setHeading(DocumentApp.ParagraphHeading.HEADING3);
 
   let movedCount = 0;
-  if (paragraphs.length > 50) {
-    for (let i = 50; i < paragraphs.length; i++) {
-      const el = paragraphs[i].copy();
-      archiveBody.appendParagraph(el);
-      paragraphs[i].removeFromParent();
+  if (children.length > 50) {
+    let splitIndex = 50;
+    for (let i = 50; i < children.length; i++) {
+      if (children[i].getType() === DocumentApp.ElementType.PAGE_BREAK) {
+        splitIndex = i + 1;
+        break;
+      }
+    }
+
+    for (let i = splitIndex; i < children.length; i++) {
+      const el = children[i].copy();
+      archiveBody.append(el);
+      children[i].removeFromParent();
       movedCount++;
     }
-    DocumentApp.getUi().alert(`Archived ${movedCount} old paragraphs to the SLT Archive document.`);
+    DocumentApp.getUi().alert(`Archived ${movedCount} elements to the SLT Archive document.`);
   } else {
     DocumentApp.getUi().alert("Document is still short. No archiving needed yet.");
   }
