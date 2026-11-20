@@ -15,6 +15,23 @@ function parseSLTData() {
     ratings: []
   };
 
+
+  let formItemMap = {};
+  try {
+    const formUrl = ss.getFormUrl();
+    if (formUrl) {
+      const form = FormApp.openByUrl(formUrl);
+      form.getItems().forEach(item => {
+        const title = item.getTitle();
+        if (title) {
+          formItemMap[title.trim()] = item;
+        }
+      });
+    }
+  } catch (e) {
+    
+  }
+
   for (let col = 1; col < headers.length; col++) {
     const question = headers[col].toString().trim();
     if (!question) continue;
@@ -29,20 +46,67 @@ function parseSLTData() {
 
     if (responses.length === 0) continue;
 
+    const formItem = formItemMap[question];
+    const itemType = formItem ? formItem.getType() : null;
     const isNumericRating = responses.every(v => typeof v === "number" && v >= 1 && v <= 10);
+    const isCheckbox = itemType === FormApp.ItemType.CHECKBOX || (!itemType && responses.some(v => typeof v === "string" && v.includes(",")));
+    const isText = itemType === FormApp.ItemType.TEXT || itemType === FormApp.ItemType.PARAGRAPH_TEXT;
 
-    if (isNumericRating) {
-      const sum = responses.reduce((acc, n) => acc + n, 0);
-      const avg = (sum / responses.length).toFixed(2);
-      const sortedNums = [...responses].sort((a, b) => a - b);
+    if (isNumericRating || itemType === FormApp.ItemType.SCALE) {
+      const numericResponses = responses.map(v => Number(v)).filter(v => !isNaN(v));
+      if (numericResponses.length === 0) continue;
+
+      const sum = numericResponses.reduce((acc, n) => acc + n, 0);
+      const avg = (sum / numericResponses.length).toFixed(2);
+      const sortedNums = [...numericResponses].sort((a, b) => a - b);
       const mid = Math.floor(sortedNums.length / 2);
       const median = sortedNums.length % 2 !== 0
         ? sortedNums[mid]
         : ((sortedNums[mid - 1] + sortedNums[mid]) / 2).toFixed(1);
 
-      const breakdown = `Avg: ${avg}/10 | Median: ${median}/10 (${responses.length} ratings)`;
+      const breakdown = `Avg: ${avg}/10 | Median: ${median}/10 (${numericResponses.length} ratings)`;
       summaryRows.push([question, "1-10 Rating", breakdown, `${avg} / 10`]);
       docSections.ratings.push(`${question}: Average ${avg}/10 (Median: ${median}/10)`);
+    } else if (isCheckbox) {
+      const counts = {};
+      responses.forEach(r => {
+        const str = r.toString().trim();
+        const choices = str.split(/,\s*/).map(c => c.trim()).filter(Boolean);
+        choices.forEach(choice => {
+          counts[choice] = (counts[choice] || 0) + 1;
+        });
+      });
+
+      const sortedChoices = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (sortedChoices.length === 0) continue;
+
+      const breakdown = sortedChoices
+        .map(([choice, count]) => `${choice}: ${count} (${Math.round((count / responses.length) * 100)}% of respondents)`)
+        .join(" | ");
+
+      const [topChoice, topCount] = sortedChoices[0];
+      const isUndiscussed = question.toLowerCase().includes("undiscussed");
+      const status = isUndiscussed
+        ? `Needs Discussion (${topChoice}: ${topCount}/${responses.length})`
+        : `${topChoice} (${topCount}/${responses.length})`;
+
+      summaryRows.push([question, "Checkbox", breakdown, status]);
+
+      const entryText = `${question} — ${breakdown}`;
+      if (isUndiscussed) {
+        docSections.undiscussed.push(entryText);
+      } else if (topChoice.toLowerCase().startsWith("yes") || topChoice.toLowerCase().includes("approve")) {
+        docSections.approved.push(entryText);
+      } else {
+        docSections.other.push(entryText);
+      }
+    } else if (isText) {
+      const textResponses = responses.map(r => r.toString().trim()).filter(Boolean);
+      const breakdown = `${textResponses.length} written responses submitted. Sample: "${textResponses[0] || 'N/A'}"`;
+      summaryRows.push([question, "Text Response", breakdown, `${textResponses.length} responses`]);
+
+      const entryText = `${question} — ${textResponses.length} written responses received`;
+      docSections.other.push(entryText);
     } else {
       const counts = {};
       responses.forEach(r => {
@@ -61,7 +125,8 @@ function parseSLTData() {
         ? `Needs Discussion (${topChoice}: ${topCount}/${responses.length})`
         : `${topChoice} (${topCount}/${responses.length})`;
 
-      summaryRows.push([question, "Multiple Choice", breakdown, status]);
+      const typeLabel = (itemType === FormApp.ItemType.LIST) ? "Dropdown" : "Multiple Choice";
+      summaryRows.push([question, typeLabel, breakdown, status]);
 
       const entryText = `${question} — ${breakdown}`;
       if (isUndiscussed) {
@@ -212,6 +277,16 @@ function syncBallotToForm() {
         .setLabels("1 - Needs Improvement", "10 - Excellent")
         .setRequired(true);
       if (description) scaleItem.setHelpText(description);
+    } else if (category.toLowerCase().includes("checkbox")) {
+      const choices = rawOptions
+        ? rawOptions.split(/,\s*/).map(c => c.trim()).filter(Boolean)
+        : ["Option 1", "Option 2"];
+
+      const cbItem = form.addCheckboxItem()
+        .setTitle(activity)
+        .setChoiceValues(choices)
+        .setRequired(false);
+      if (description) cbItem.setHelpText(description);
     } else {
       const choices = rawOptions
         ? rawOptions.split(/,\s*/).map(c => c.trim()).filter(Boolean)
