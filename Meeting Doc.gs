@@ -15,17 +15,17 @@ function insertMeetingTemplate() {
 
   const cursor = body.editAsText();
   
-  body.insertParagraph(0, `SLT Meeting Minutes — ${dateStr}`)
+  body.insertParagraph(0, `SLT Meeting — ${dateStr}`)
       .setHeading(DocumentApp.ParagraphHeading.HEADING1);
 
   const metaParagraph = body.insertParagraph(1, "Attendees: Mrs. Sharples, President, Vice President, Secretary, Treasurer, Historian, and Technology Specialist. Representatives:\n");
   metaParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
 
   body.insertParagraph(2, "Agenda & Discussion").setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  body.insertListItem(3, "Welcome & Approval of Previous Minutes");
-  body.insertListItem(4, "After School Activities Review");
-  body.insertListItem(5, "In School Activities Review");
-  body.insertListItem(6, "Undiscussed Activities & Floor Debate");
+  body.insertListItem(3, "?");
+  body.insertListItem(4, "?");
+  body.insertListItem(5, "?");
+  body.insertListItem(6, "?");
 
   body.insertParagraph(7, "\nAction Items").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const actionTable = body.insertTable(8, [
